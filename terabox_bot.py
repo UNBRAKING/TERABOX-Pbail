@@ -81,12 +81,9 @@ def download_video(download_url: str, filename: str) -> tuple:
     except Exception as e:
         return False, str(e)
 
-@app.on_message(filters.private & filters.text)
+@app.on_message(filters.private & filters.text & ~filters.command(["start", "help"]))
 async def handle_url(client: Client, message: Message):
     text = message.text.strip()
-    if text.startswith("/start") or text.startswith("/help"):
-        return
-
     url = text  # <-- yeh line add karein
 
     user_id = message.from_user.id
@@ -191,7 +188,6 @@ async def start(client, message):
         "🤖 TeraBox Download Bot\n\n"
         "Send any TeraBox video URL and I'll download it for you!\n"
         "Use /help for more info."
-        # parse_mode hata dein ya parse_mode="markdown" karein
     )
 
 @app.on_message(filters.command("help"))
@@ -211,7 +207,6 @@ async def help_cmd(client, message):
         "- File size limit: 50MB (Telegram limit)\n"
         "- Processing may take a few seconds\n\n"
         "Need more help? Contact @your_username"
-        # parse_mode hata dein ya parse_mode="markdown" karein
     )
 
 if __name__ == "__main__":
