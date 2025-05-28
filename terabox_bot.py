@@ -4,6 +4,16 @@ import json
 import os
 import asyncio
 import urllib3
+from pyrogram.errors import FloodWait
+import asyncio
+
+async def safe_reply(message, text):
+    try:
+        await message.reply_text(text)
+    except FloodWait as e:
+        await asyncio.sleep(e.value)
+        await message.reply_text(text)
+
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 from pyrogram import Client, filters
@@ -84,7 +94,7 @@ async def handle_url(client: Client, message: Message):
     )
 
     if not is_valid_terabox_url(url):
-        await message.reply_text("❌ Invalid TeraBox URL.\nSend a valid TeraBox link.")
+        await safe_reply(message, "❌ Invalid TeraBox URL.\nSend a valid TeraBox link.")
         return
 
     await message.reply_text("⏳ Processing your request...")
