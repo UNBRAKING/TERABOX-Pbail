@@ -87,6 +87,8 @@ async def handle_url(client: Client, message: Message):
     if text.startswith("/start") or text.startswith("/help"):
         return
 
+    url = text  # <-- yeh line add karein
+
     user_id = message.from_user.id
     username = message.from_user.username or ""
     # Save user info to MongoDB
