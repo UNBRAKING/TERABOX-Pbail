@@ -81,9 +81,12 @@ def download_video(download_url: str, filename: str) -> tuple:
     except Exception as e:
         return False, str(e)
 
-@app.on_message(filters.private & filters.text & ~filters.command(["start", "help"]))
+@app.on_message(filters.private & filters.text)
 async def handle_url(client: Client, message: Message):
-    url = message.text.strip()
+    text = message.text.strip()
+    if text.startswith("/start") or text.startswith("/help"):
+        return
+
     user_id = message.from_user.id
     username = message.from_user.username or ""
     # Save user info to MongoDB
