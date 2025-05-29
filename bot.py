@@ -6,6 +6,8 @@ import asyncio
 import urllib3
 from pyrogram.errors import FloodWait
 import asyncio
+import time
+import aiohttp
 
 async def safe_reply(message, text):
     try:
@@ -67,19 +69,23 @@ def get_video_info(terabox_url: str):
     except Exception as e:
         return {"error": str(e)}
 
-def download_video(download_url: str, filename: str) -> tuple:
-    try:
-        os.makedirs('downloads', exist_ok=True)
-        file_path = os.path.join('downloads', filename)
-        with requests.get(download_url, stream=True, timeout=120) as r:
-            r.raise_for_status()
-            with open(file_path, 'wb') as f:
-                for chunk in r.iter_content(chunk_size=8192):
-                    if chunk:
-                        f.write(chunk)
-        return True, file_path
-    except Exception as e:
-        return False, str(e)
+async def download_video(download_url: str, filename: str, retries: int = 3) -> tuple:
+    for attempt in range(retries):
+        try:
+            os.makedirs('downloads', exist_ok=True)
+            file_path = os.path.join('downloads', filename)
+            async with aiohttp.ClientSession() as session:
+                async with session.get(download_url, timeout=300) as resp:
+                    if resp.status != 200:
+                        raise Exception(f"HTTP {resp.status}")
+                    with open(file_path, 'wb') as f:
+                        async for chunk in resp.content.iter_chunked(2048):  # chunk size changed to 2048
+                            f.write(chunk)
+            return True, file_path
+        except Exception as e:
+            if attempt == retries - 1:
+                return False, f"Download failed: {str(e)}"
+            await asyncio.sleep(3)  # wait before retry
 
 @app.on_message(filters.private & filters.text & ~filters.command(["start", "help"]))
 async def handle_url(client: Client, message: Message):
@@ -104,7 +110,10 @@ async def handle_url(client: Client, message: Message):
     video_info = get_video_info(url)
     if "error" in video_info:
         if "status 500" in video_info["error"]:
-            await message.reply_text("❌ TeraBox server busy hai ya down hai. Thodi der baad try karein.")
+            await message.reply_text(
+                "❌ TeraBox server busy hai ya down hai. Thodi der baad try karein.\n"
+                "Ya dusra TeraBox link try karein."
+            )
         else:
             await message.reply_text(f"❌ Error: {video_info['error']}")
         logs_col.insert_one({
@@ -137,9 +146,13 @@ async def handle_url(client: Client, message: Message):
     # Download file to temp
     await message.reply_text("⬇️ Downloading video...")
 
-    success, file_path = download_video(download_url, filename)
+    success, file_path = await download_video(download_url, filename)
     if not success:
-        await message.reply_text(f"❌ Download Failed: {file_path}")
+        await message.reply_text(
+            "❌ Download Failed: File could not be downloaded from TeraBox.\n"
+            "Reason: " + file_path + "\n"
+            "Please try again later or with another link."
+        )
         logs_col.insert_one({
             "user_id": user_id,
             "username": username,
